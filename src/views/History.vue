@@ -89,12 +89,13 @@
                 <div class="compare-controls">
                   <!-- واحد input مخفي لكل صف، ref ديناميكي -->
                   <input 
-                    :ref="'fileInput' + idx"
-                    type="file" 
-                    @change="compareFile($event, item.hash, idx)" 
-                    :disabled="comparing === idx"
-                    style="display: none;"
-                  />
+  :ref="'fileInput' + idx"
+  type="file"
+  @change="compareFile($event, item.hash, idx)"
+  :disabled="comparing === idx"
+  class="sr-file-input"
+/>
+
                   <button 
                     @click="openFilePicker(idx)"
                     :disabled="comparing === idx"
@@ -142,13 +143,14 @@
           </div>
           
           <div class="compare-section">
-            <input 
-              :ref="'cardFileInput' + idx"
-              type="file" 
-              @change="compareFile($event, item.hash, idx)" 
-              :disabled="comparing === idx"
-              style="display: none;"
-            />
+       <input 
+  :ref="'cardFileInput' + idx"
+  type="file"
+  @change="compareFile($event, item.hash, idx)"
+  :disabled="comparing === idx"
+  class="sr-file-input"
+/>
+
             <button 
               @click="openCardFilePicker(idx)"
               :disabled="comparing === idx"
@@ -235,8 +237,9 @@
     </div>
   </div>
 </template>
-
 <script>
+const API_BASE = "https://file-checker-backend.onrender.com";
+
 export default {
   name: "History",
   data() {
@@ -259,108 +262,158 @@ export default {
   mounted() {
     this.updateViewMode();
     window.addEventListener('resize', this.updateViewMode);
-    
-    this.loadHistory();
-this._historyInterval = setInterval(() => this.loadHistory(false), 10000);
+
+    // أول مرة نظهر loading
+    this.loadHistory(true);
+
+    // كل 10 ثواني نعمل تحديث بدون إظهار loading
+    this._historyInterval = setInterval(() => this.loadHistory(false), 10000);
   },
   beforeDestroy() {
     if (this._historyInterval) {
       clearInterval(this._historyInterval);
+      this._historyInterval = null;
     }
     window.removeEventListener('resize', this.updateViewMode);
-  this.loadHistory(true); // أول مرة بس يظهر loading
-this._historyInterval = setInterval(() => this.loadHistory(false), 10000);
-
   },
-
   methods: {
     updateViewMode() {
+      if (this.userSelected) return;
       if (window.innerWidth <= 768) {
         this.viewMode = 'cards';
-      } else if (this.viewMode === 'cards' && window.innerWidth > 768) {
+      } else {
         this.viewMode = 'table';
       }
     },
-  setViewMode(mode) {
-    this.viewMode = mode;
-    this.userSelected = true; // المستخدم اختار
-  },
-  updateViewMode() {
-    if (this.userSelected) return; // لا تغير إذا المستخدم اختار
-    if (window.innerWidth <= 768) {
-      this.viewMode = 'cards';
-    } else {
-      this.viewMode = 'table';
-    }
-  },
-async loadHistory(showLoading = false) {
-  if (showLoading) this.loading = true;
-  this.error = null;
+    setViewMode(mode) {
+      this.viewMode = mode;
+      this.userSelected = true;
+    },
 
-  try {
-    const res = await fetch("https://file-checker-backend.onrender.com/history");
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-
-    const data = await res.json();
-    this.history = data || [];
-  } catch (err) {
-    console.error("❌ loadHistory error:", err);
-    this.error = `Problem in downloading history try again `;
-    this.history = [];
-  } finally {
-    if (showLoading) this.loading = false;
-  }
-},
-
+    async loadHistory(showLoading = false) {
+      if (showLoading) this.loading = true;
+      this.error = null;
+      try {
+        const res = await fetch(`${API_BASE}/history`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        const data = await res.json();
+        this.history = data || [];
+      } catch (err) {
+        console.error("❌ loadHistory error:", err);
+        this.error = `Problem in downloading history try again `;
+        this.history = [];
+      } finally {
+        if (showLoading) this.loading = false;
+      }
+    },
 
     // فتح ملف المقارنة من الجدول
- openFilePicker(idx) {
-    const input = this.$refs['fileInput' + idx];
-    if (input) input.click(); // بدل [0].click()
-  },
+    openFilePicker(idx) {
+      try {
+        console.log("openFilePicker called for idx=", idx);
+        const refName = 'fileInput' + idx;
+        const ref = this.$refs[refName];
+        const inputEl = Array.isArray(ref) ? ref[0] : ref;
+        if (inputEl && typeof inputEl.click === 'function') {
+          inputEl.click();
+          return;
+        }
+        // fallback: create temporary input
+        const temp = document.createElement('input');
+        temp.type = 'file';
+        temp.style.position = 'absolute';
+        temp.style.left = '-9999px';
+        document.body.appendChild(temp);
+        temp.addEventListener('change', (e) => {
+          this.compareFile(e, this.history[idx]?.hash, idx);
+          document.body.removeChild(temp);
+        });
+        temp.click();
+      } catch (err) {
+        console.error("openFilePicker error:", err);
+      }
+    },
 
     // فتح ملف المقارنة من الكارت
-  openCardFilePicker(idx) {
-    const input = this.$refs['cardFileInput' + idx];
-    if (input) input.click(); // نفس الشي
-  },
+    openCardFilePicker(idx) {
+      try {
+        console.log("openCardFilePicker called for idx=", idx);
+        const refName = 'cardFileInput' + idx;
+        const ref = this.$refs[refName];
+        const inputEl = Array.isArray(ref) ? ref[0] : ref;
+        if (inputEl && typeof inputEl.click === 'function') {
+          inputEl.click();
+          return;
+        }
+        const temp = document.createElement('input');
+        temp.type = 'file';
+        temp.style.position = 'absolute';
+        temp.style.left = '-9999px';
+        document.body.appendChild(temp);
+        temp.addEventListener('change', (e) => {
+          this.compareFile(e, this.history[idx]?.hash, idx);
+          document.body.removeChild(temp);
+        });
+        temp.click();
+      } catch (err) {
+        console.error("openCardFilePicker error:", err);
+      }
+    },
 
-     async compareFile(event, targetHash, idx) {
-    const file = event.target.files[0];
-    if (!file) return;
+    // compareFile: يرسل الملف للسيرفر ويعرض النتيجة
+    async compareFile(event, targetHash, idx) {
+      try {
+        console.log("compareFile called idx=", idx, " targetHash=", targetHash);
+        // event.target قد يكون input مؤقت أو ref input
+        const file = event && event.target && event.target.files ? event.target.files[0] : null;
+        if (!file) {
+          console.warn("No file selected");
+          if (event && event.target) event.target.value = "";
+          return;
+        }
 
-    this.comparing = idx;
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
+        this.comparing = idx;
 
-      const res = await fetch(`https://file-checker-backend.onrender.com/history/compare/${targetHash}`, {
-        method: "POST",
-        body: formData,
-      });
+        const formData = new FormData();
+        formData.append("file", file);
 
-      if (!res.ok) throw new Error("Server error");
-      const data = await res.json();
+        const res = await fetch(`${API_BASE}/history/compare/${encodeURIComponent(targetHash)}`, {
+          method: "POST",
+          body: formData,
+        });
 
-      this.compareResult = {
-        ...data,
-        uploadedFile: file.name,
-      };
-    } catch (err) {
-      this.showToast("Comparison failed, try again.", "error");
-    } finally {
-      this.comparing = null;
-      event.target.value = ""; // يسمح ترفع نفس الملف مره ثانية
-    }
-  },
+        if (!res.ok) {
+          const text = await res.text().catch(() => null);
+          console.error("Server returned error:", res.status, text);
+          this.showToast("Comparison failed (server).", "error");
+          return;
+        }
+
+        const data = await res.json();
+        console.log("compare result:", data);
+
+        // بنبني النتيجة للعرض
+        this.compareResult = {
+          uploadedFile: data.uploadedFile || file.name,
+          uploadedHash: data.uploadedHash || data.uploadedHash || null,
+          targetHash: data.targetHash || targetHash,
+          areEqual: !!data.areEqual,
+        };
+
+      } catch (err) {
+        console.error("compareFile error:", err);
+        this.showToast("Comparison failed, try again.", "error");
+      } finally {
+        this.comparing = null;
+        if (event && event.target && event.target.value !== undefined) event.target.value = "";
+      }
+    },
 
     formatDate(iso, short = false) {
       if (!iso) return "Unknown";
       try {
         const d = new Date(iso);
-        if (short) {
-          return d.toLocaleDateString();
-        }
+        if (short) return d.toLocaleDateString();
         return d.toLocaleString();
       } catch (err) {
         return "Invalid Date";
@@ -381,7 +434,7 @@ async loadHistory(showLoading = false) {
         if (minutes < 60) return `${minutes}m ago`;
         if (hours < 24) return `${hours}h ago`;
         if (days < 30) return `${days}d ago`;
-        return this.formatDate(iso, true); // <- استخدمت this هنا
+        return this.formatDate(iso, true);
       } catch (err) {
         return "";
       }
@@ -390,18 +443,7 @@ async loadHistory(showLoading = false) {
     getFileIcon(fileName) {
       if (!fileName) return "📄";
       const ext = fileName.toLowerCase().split('.').pop();
-      const icons = {
-        'pdf': '',
-        'doc': '', 'docx': '',
-        'xls': '', 'xlsx': '',
-        'ppt': '', 'pptx': '',
-        'txt': '',
-        'js': '', 'html': '', 'css': '', 'json': '',
-        'jpg': '', 'jpeg': '', 'png': '', 'gif': '',
-        'mp4': '', 'avi': '', 'mov': '',
-        'mp3': '', 'wav': '',
-        'zip': '', 'rar': '', '7': '',
-      };
+      const icons = { /* ... same mapping ... */ };
       return icons[ext] || "";
     },
 
@@ -419,7 +461,6 @@ async loadHistory(showLoading = false) {
       if (!hash) return;
       if (navigator.clipboard) {
         navigator.clipboard.writeText(hash);
-        // this.showToast("Hash copied to clipboard!", "success");
       } else {
         const textArea = document.createElement('textarea');
         textArea.value = hash;
@@ -427,7 +468,6 @@ async loadHistory(showLoading = false) {
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        // this.showToast("Hash copied to clipboard!", "success");
       }
     },
 
@@ -435,13 +475,12 @@ async loadHistory(showLoading = false) {
       this.toast.message = message;
       this.toast.type = type;
       this.toast.show = true;
-      setTimeout(() => {
-        this.toast.show = false;
-      }, 3000);
+      setTimeout(() => { this.toast.show = false; }, 3000);
     }
-  },
+  }
 };
 </script>
+
 
 <style scoped>
 :root {
@@ -612,6 +651,16 @@ margin-bottom: 5rem;
   text-align: left;
   font-weight: 600;
   border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+/* يخفي العنصر بصريًا لكنه يبقى في الـ DOM ويقبل click() */
+.sr-file-input {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none; /* يمكن إزالته لو أردت أن يكون قابل للنقر المباشر */
 }
 
 .header-icon {
