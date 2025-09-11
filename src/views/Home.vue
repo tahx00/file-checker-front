@@ -106,6 +106,7 @@ export default {
   name: "Home",
   data() {
     return {
+      startupNoticeShown: false,
         lastHash: null,
     isDragging: false,
     selectedFiles: [],
@@ -138,6 +139,14 @@ export default {
     ['dragenter','dragover','dragleave','drop'].forEach(evt => {
       document.addEventListener(evt, preventDefault, false);
     });
+    if (!this.startupNoticeShown) {
+  this.showToast(
+    "⏳ Please note: The first comparison may take 30–50 seconds while the server starts.",
+    "info"
+  );
+  this.startupNoticeShown = true;
+}
+
   },
   beforeDestroy() {
     if (this._uploadTimer) clearInterval(this._uploadTimer);
@@ -299,7 +308,7 @@ for (const f of doneFiles) {
   this.toast.show = true;
   setTimeout(() => {
     this.toast.show = false;
-  }, 3000); // يختفي بعد 3 ثواني
+  }, 7000); // يختفي بعد 3 ثواني
 },
 
   },
@@ -549,10 +558,10 @@ flex-direction: column;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   text-align: center;
   width: 80%;
-  height: 3rem;
+  height: 5rem;
   font-size: 1rem;
 }
-.toast.info { background: #3498db; }
+.toast.info { background: #2b709f; }
 .toast.success { background: #2ecc71; }
 .toast.error { background: #e74c3c; }
 
